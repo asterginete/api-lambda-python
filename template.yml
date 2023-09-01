@@ -1,0 +1,310 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless Application for CRUD operations with additional features.
+
+Globals:
+  Function:
+    Timeout: 10
+
+Resources:
+  # DynamoDB Tables
+  UsersTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: UserID
+        Type: String
+
+  ItemsTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: ItemID
+        Type: String
+
+  FilesTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: FileID
+        Type: String
+
+  NotificationsTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: NotificationID
+        Type: String
+
+  SearchLogsTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: LogID
+        Type: String
+
+  UserActivityLogsTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: ActivityID
+        Type: String
+
+  # Lambda Functions
+  AuthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/lambda/auth/
+      Handler: handler.lambda_handler
+      Runtime: python3.8
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+      Events:
+        PostResource:
+          Type: Api
+          Properties:
+            Path: /auth
+            Method: POST
+
+  CreateItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/lambda/items/create.py
+      Handler: create.lambda_handler
+      Runtime: python3.8
+      Environment:
+        Variables:
+          ITEMS_TABLE: !Ref ItemsTable
+      Events:
+        PostResource:
+          Type: Api
+          Properties:
+            Path: /items
+            Method: POST
+
+  ReadItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/lambda/items/read.py
+      Handler: read.lambda_handler
+      Runtime: python3.8
+      Environment:
+        Variables:
+          ITEMS_TABLE: !Ref ItemsTable
+      Events:
+        GetResource:
+          Type: Api
+          Properties:
+            Path: /items/{ItemID}
+            Method: GET
+
+  UpdateItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/lambda/items/update.py
+      Handler: update.lambda_handler
+      Runtime: python3.8
+      Environment:
+        Variables:
+          ITEMS_TABLE: !Ref ItemsTable
+      Events:
+        PutResource:
+          Type: Api
+          Properties:
+            Path: /items/{ItemID}
+            Method: PUT
+
+  DeleteItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/lambda/items/delete.py
+      Handler: delete.lambda_handler
+      Runtime: python3.8
+      Environment:
+        Variables:
+          ITEMS_TABLE: !Ref ItemsTable
+      Events:
+        DeleteResource:
+          Type: Api
+          Properties:
+            Path: /items/{ItemID}
+            Method: DELETE
+
+  FileUploadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/lambda/files/upload.py
+      Handler: upload.lambda_handler
+      Runtime: python3.8
+      Environment:
+        Variables:
+          FILES_BUCKET: !Ref FilesBucket
+      Events:
+        PostResource:
+          Type: Api
+          Properties:
+            Path: /files
+            Method: POST
+
+  FileDeleteFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/lambda/files/delete.py
+      Handler: delete.lambda_handler
+      Runtime: python3.8
+      Environment:
+        Variables:
+          FILES_BUCKET: !Ref FilesBucket
+      Events:
+        DeleteResource:
+          Type: Api
+          Properties:
+            Path: /files/{FileID}
+            Method: DELETE
+
+  SendNotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/lambda/notifications/send.py
+      Handler: send.lambda_handler
+      Runtime: python3.8
+      Environment:
+        Variables:
+          NOTIFICATIONS_TABLE: !Ref NotificationsTable
+      Events:
+        PostResource:
+          Type: Api
+          Properties:
+            Path: /notifications
+            Method: POST
+
+  RetrieveNotificationsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/lambda/notifications/retrieve.py
+      Handler: retrieve.lambda_handler
+      Runtime: python3.8
+      Environment:
+        Variables:
+          NOTIFICATIONS_TABLE: !Ref NotificationsTable
+      Events:
+        GetResource:
+          Type: Api
+          Properties:
+            Path: /notifications/{UserID}
+            Method: GET
+
+  # ... Additional Lambda functions for other features ...
+
+  # S3 Bucket for File Uploads
+  FilesBucket:
+    Type: AWS::S3::Bucket
+
+  # Cognito User Pool for Authentication
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      # ... User pool properties ...
+
+  # IAM Roles and Policies
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: DynamoDBAccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                Resource: "*"
+
+        - PolicyName: S3AccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                Resource: 
+                  - !Sub "arn:aws:s3:::${FilesBucket}/*"
+
+        - PolicyName: CognitoAccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminCreateUser
+                  - cognito-idp:AdminDeleteUser
+                  - cognito-idp:AdminUpdateUserAttributes
+                  - cognito-idp:AdminGetUser
+                Resource: "*"
+
+        - PolicyName: SNSAccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: "*"
+
+        # ... Additional policies for other AWS services ...
+
+Outputs:
+  AuthApi:
+    Description: "API Gateway endpoint URL for Prod environment for Auth function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/auth/"
+
+  ItemsApi:
+    Description: "API Gateway endpoint URL for Prod environment for Items function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/items/"
+
+  FilesApi:
+    Description: "API Gateway endpoint URL for Prod environment for File operations"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/files/"
+
+  NotificationsApi:
+    Description: "API Gateway endpoint URL for Prod environment for Notification operations"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/notifications/"
+
+  UsersTableName:
+    Description: "Name of the Users DynamoDB table"
+    Value: !Ref UsersTable
+
+  ItemsTableName:
+    Description: "Name of the Items DynamoDB table"
+    Value: !Ref ItemsTable
+
+  FilesBucketName:
+    Description: "Name of the S3 bucket for file uploads"
+    Value: !Ref FilesBucket
+
+  UserPoolId:
+    Description: "ID of the Cognito User Pool"
+    Value: !Ref UserPool
+
+  LambdaExecutionRoleArn:
+    Description: "ARN of the Lambda execution role"
+    Value: !GetAtt LambdaExecutionRole.Arn
+
+  # ... Additional outputs for other resources ...
+
+

@@ -1,13 +1,18 @@
 [[source]]
+name = "pypi"
 url = "https://pypi.org/simple"
 verify_ssl = true
-name = "pypi"
+
+[dev-packages]
+# Development packages go here, e.g., testing libraries
 
 [packages]
 boto3 = "*"
+jsonschema = "3.2.0"
 
-[dev-packages]
+# Additional libraries might be added based on specific features or requirements.
+# For instance, if you decide to use Flask with Zappa for serverless deployment, 
+# you'd add those libraries here.
 
 [requires]
-python_version = "3.11"
-python_full_version = "3.11.0"
+python_version = "3.8"
